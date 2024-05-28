@@ -1,48 +1,68 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class BallController : MonoBehaviour
 {
-    public float speed = 5.0f;
-    private Vector2 direction = new Vector2(1, 1);
+    public float speed = 30f;
+    public float angleVariance = 15f;
+    private Rigidbody rb;
+    private Vector3 direction;
+
+    void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        rb.velocity = Vector3.zero;
+    }
 
     void Update()
     {
-        // Déplace la balle selon la direction et la vitesse
-        transform.Translate(direction * speed * Time.deltaTime);
-
-        // Détecte les collisions avec les murs
-        CheckCollisionWithWalls();
+        if (GameManager.instance.gameStarted && rb.velocity == Vector3.zero)
+        {
+            LaunchBall();
+        }
     }
 
-    void CheckCollisionWithWalls()
+    void FixedUpdate()
     {
-        Vector2 position = transform.position;
-
-        // Inverse la direction si la balle touche les bords de l'écran
-        if (position.x <= -8.5f || position.x >= 8.5f)
+        if (GameManager.instance.gameStarted)
         {
-            direction.x = -direction.x;
+            rb.velocity = rb.velocity.normalized * speed;
         }
-
-        if (position.y >= 4.5f)
-        {
-            direction.y = -direction.y;
-        }
-
-        // Vous pouvez ajouter une condition pour détecter le bas de l'écran si nécessaire
     }
 
-    private void OnCollisionEnter2D(Collision2D collision)
+    public void LaunchBall()
     {
-        // Inverse la direction en fonction de l'objet avec lequel la balle entre en collision
-        if (collision.gameObject.CompareTag("Paddle"))
+        // Détermine un angle aléatoire dans un cône de ±30 degrés autour de l'axe Z négatif
+        float angle = Random.Range(-30f, 30f);
+        float angleRad = angle * Mathf.Deg2Rad;
+
+        // Calculer la direction avec l'angle par rapport à l'axe Z négatif
+        direction = new Vector3(Mathf.Sin(angleRad), 0, -Mathf.Cos(angleRad));
+
+        // Appliquer la vitesse à la direction
+        rb.velocity = direction * speed;
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        Debug.Log("Collision with: " + collision.gameObject.name);
+
+        Brick brick = collision.gameObject.GetComponent<Brick>();
+        if (brick != null)
         {
-            direction.y = -direction.y;
+            brick.Hit();
+            GameManager.instance.AddScore(10);
         }
-        else if (collision.gameObject.CompareTag("Brick"))
-        {
-            direction.y = -direction.y;
-            Destroy(collision.gameObject);  // Détruit la brique
-        }
+
+        Vector3 normal = collision.contacts[0].normal;
+        Vector3 reflectDir = Vector3.Reflect(new Vector3(rb.velocity.x, 0, rb.velocity.z), new Vector3(normal.x, 0, normal.z));
+
+        float angle = Random.Range(-angleVariance, angleVariance);
+        float angleRad = angle * Mathf.Deg2Rad;
+
+        reflectDir = Quaternion.Euler(0, angle, 0) * reflectDir;
+
+        rb.velocity = reflectDir.normalized * speed;
     }
 }

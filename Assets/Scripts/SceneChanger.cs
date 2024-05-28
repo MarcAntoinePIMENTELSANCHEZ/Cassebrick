@@ -10,4 +10,10 @@ public class SceneChanger : MonoBehaviour
         SceneManager.LoadScene(sceneName);
         Debug.Log("Changement de sc�ne r�ussi");
     }
+    public void QuitApplication()
+    {
+        Debug.Log("Quitter l'application");
+        Application.Quit();
+        Debug.Log("Application quittée");
+    }
 }

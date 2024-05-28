@@ -5,11 +5,13 @@ TagManager:
   serializedVersion: 2
   tags:
   - BottomBarrier
+  - Wall
+  - Ball
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - CollisionLayer
   - Water
   - UI
   - 
