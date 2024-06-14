@@ -5,6 +5,11 @@ public class EndGameMenu : MonoBehaviour
 {
     public GameObject endGameMenuUI;
 
+    void Awake()
+    {
+        DontDestroyOnLoad(gameObject);
+    }
+
     public void ShowEndGameMenu()
     {
         if (endGameMenuUI != null)
@@ -33,6 +38,6 @@ public class EndGameMenu : MonoBehaviour
     public void GoToHighScores()
     {
         Time.timeScale = 1f;
-        SceneManager.LoadScene("ScoreScene"); // Charge la scène des meilleurs scores
+        SceneManager.LoadScene("ScoreScene"); // Changez le nom de la scène si nécessaire
     }
 }

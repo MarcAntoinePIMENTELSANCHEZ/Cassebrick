@@ -3,45 +3,58 @@ using TMPro;
 
 public class PlayerNameInput : MonoBehaviour
 {
-    public TMP_InputField nameInputField;
     public static string playerName;
+    public TMP_InputField inputField; // Assurez-vous que cela est assigné dans l'inspecteur
 
-    public void SetPlayerName()
+    void Start()
     {
-        playerName = nameInputField.text;
-        if (!string.IsNullOrEmpty(playerName))
+        // Vérifiez que le champ inputField est bien assigné
+        if (inputField == null)
         {
-            GameManager.instance.gameStarted = true;
-            HideInputField();
+            inputField = GetComponent<TMP_InputField>();
+            if (inputField == null)
+            {
+                Debug.LogError("TMP_InputField component not found.");
+                return;
+            }
         }
+
+        inputField.onEndEdit.AddListener(SetPlayerName);
     }
 
-    public static void HideInputField()
+    public void SetPlayerName(string name)
     {
-        PlayerNameInput instance = FindObjectOfType<PlayerNameInput>();
-        if (instance != null && instance.nameInputField != null)
-        {
-            instance.nameInputField.gameObject.SetActive(false);
-        }
-    }
-
-    public static void ShowInputField()
-    {
-        PlayerNameInput instance = FindObjectOfType<PlayerNameInput>();
-        if (instance != null && instance.nameInputField != null)
-        {
-            instance.nameInputField.gameObject.SetActive(true);
-            instance.nameInputField.text = string.Empty;
-        }
+        playerName = name;
     }
 
     public static void ClearPlayerName()
     {
         playerName = string.Empty;
-        PlayerNameInput instance = FindObjectOfType<PlayerNameInput>();
-        if (instance != null && instance.nameInputField != null)
+    }
+
+    public static void ShowInputField()
+    {
+        GameObject inputFieldObj = GameObject.Find("PlayerNameInputField");
+        if (inputFieldObj != null)
         {
-            instance.nameInputField.text = string.Empty;
+            inputFieldObj.SetActive(true);
+        }
+        else
+        {
+            Debug.LogError("PlayerNameInputField GameObject not found.");
+        }
+    }
+
+    public static void HideInputField()
+    {
+        GameObject inputFieldObj = GameObject.Find("PlayerNameInputField");
+        if (inputFieldObj != null)
+        {
+            inputFieldObj.SetActive(false);
+        }
+        else
+        {
+            Debug.LogError("PlayerNameInputField GameObject not found.");
         }
     }
 }

@@ -7,7 +7,7 @@ public class BrickGenerator : MonoBehaviour
     public GameObject brickPrefab;
     public GameObject platform; // Référence à l'objet plateau
     public Transform bricksContainer; // Référence au conteneur des briques
-    public int rows = 5; // Nombre de rangées sur l'axe Z
+    public int rows = 6; // Nombre de rangées sur l'axe Z
     public int columns = 10; // Nombre de colonnes sur l'axe X
     public float fillProbability = 0.7f; // Probabilité de générer une brique à une position donnée
     public int minDurability = 1;

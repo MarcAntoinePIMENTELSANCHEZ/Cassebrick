@@ -6,15 +6,8 @@ public class BottomBarrier : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Ball"))
         {
-            Debug.Log("Ball hit the bottom barrier");
-            if (GameManager.instance != null)
-            {
-                GameManager.instance.EndGame();
-            }
-            else
-            {
-                Debug.LogError("GameManager instance is not found");
-            }
+            Destroy(collision.gameObject);  // Détruire la balle
+            GameManager.instance.RespawnBall();  // Faire respawn une nouvelle balle
         }
     }
 }

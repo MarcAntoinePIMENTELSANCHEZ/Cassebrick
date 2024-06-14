@@ -1,20 +1,31 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using TMPro;
-using System.IO;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager instance;
-    public TextMeshProUGUI scoreText;
-    public int score;
-    public EndGameMenu endGameMenu;
-    public int remainingBricks;
     public BrickGenerator brickGenerator;
-
+    public int remainingBricks;
     public bool gameStarted = false;
+
+    public int lives = 3; // Nombre de vies du joueur
+    public GameObject ballPrefab; // Prefab de la balle
+    public GameObject paddlePrefab; // Prefab de la barre (paddle)
+    public Transform leftBarrier; // Barrière gauche
+    public Transform rightBarrier; // Barrière droite
+    public float zOffset = 1.0f; // Offset sur l'axe Z
+
+    public float gameDuration = 300f; // Durée du jeu en secondes
+    private float timeRemaining;
+    public TextMeshProUGUI timerText; // Texte pour afficher le timer
+    public TextMeshProUGUI livesText; // Texte pour afficher les vies restantes
+
+    private BallController currentBall;
+    private GameObject paddleInstance; // Instance de la barre
+    private GameObject playerNameInputField; // Instance du champ de saisie du nom
 
     void Awake()
     {
@@ -22,6 +33,37 @@ public class GameManager : MonoBehaviour
         {
             instance = this;
             DontDestroyOnLoad(gameObject);
+
+            // Charger les prefabs nécessaires
+            if (ballPrefab == null)
+            {
+                ballPrefab = Resources.Load<GameObject>("BallPrefab"); // Assurez-vous que le prefab est dans un dossier Resources
+            }
+
+            if (paddlePrefab == null)
+            {
+                paddlePrefab = Resources.Load<GameObject>("PaddlePrefab"); // Assurez-vous que le prefab est dans un dossier Resources
+            }
+
+            // Assurer que les barrières sont bien assignées
+            if (leftBarrier == null || rightBarrier == null)
+            {
+                leftBarrier = GameObject.Find("LeftBarrier").transform;
+                rightBarrier = GameObject.Find("RightBarrier").transform;
+                DontDestroyOnLoad(leftBarrier);
+                DontDestroyOnLoad(rightBarrier);
+            }
+
+            // Assigner et conserver le champ de saisie du nom
+            playerNameInputField = GameObject.Find("PlayerNameInputField");
+            if (playerNameInputField != null)
+            {
+                DontDestroyOnLoad(playerNameInputField);
+            }
+            else
+            {
+                Debug.LogError("PlayerNameInputField GameObject not found.");
+            }
         }
         else
         {
@@ -31,18 +73,28 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        ResetGame();
+        InitializeGame();
     }
 
     void Update()
     {
-        if (!gameStarted && Input.GetKeyDown(KeyCode.Space))
+        if (gameStarted)
+        {
+            UpdateTimer();
+
+            // Lancer la balle si le joueur appuie sur la barre d'espace
+            if (currentBall != null && Input.GetKeyDown(KeyCode.Space))
+            {
+                currentBall.LaunchBall();
+                currentBall = null; // Réinitialiser la référence à la balle actuelle
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.Space))
         {
             if (!string.IsNullOrEmpty(PlayerNameInput.playerName))
             {
-                gameStarted = true;
-                PlayerNameInput.HideInputField();
-                LaunchBall();
+                PlayerNameInput.HideInputField(); // Masquer le champ de saisie du nom
+                StartNewGame();
             }
             else
             {
@@ -51,41 +103,52 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    void UpdateTimer()
+    {
+        if (timeRemaining > 0)
+        {
+            timeRemaining -= Time.deltaTime;
+            UpdateTimerText();
+            if (timeRemaining <= 0)
+            {
+                EndGame();
+            }
+        }
+    }
+
+    void UpdateTimerText()
+    {
+        if (timerText == null)
+        {
+            timerText = GameObject.Find("TimerText").GetComponent<TextMeshProUGUI>();
+            if (timerText == null)
+            {
+                Debug.LogError("TimerText not found in the scene.");
+                return;
+            }
+        }
+
+        int minutes = Mathf.FloorToInt(timeRemaining / 60);
+        int seconds = Mathf.FloorToInt(timeRemaining % 60);
+        timerText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
+    }
+
     public void AddScore(int value)
     {
-        if (gameStarted)
+        if (gameStarted && ScoreManager.instance != null)
         {
-            score += value;
-            UpdateScoreText();
+            ScoreManager.instance.AddScore(value);
         }
-    }
-
-    void UpdateScoreText()
-    {
-        if (scoreText != null)
-        {
-            scoreText.text = "Score: " + score.ToString();
-        }
-    }
-
-    public void SaveScore()
-    {
-        string filePath = Application.persistentDataPath + "/score.csv";
-        using (StreamWriter writer = new StreamWriter(filePath, true))
-        {
-            string playerName = PlayerNameInput.playerName;
-            string dateTime = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            writer.WriteLine($"{playerName},{score},{dateTime}");
-        }
-        Debug.Log("Score saved to " + filePath);
     }
 
     public void EndGame()
     {
-        Debug.Log("EndGame called");
-        SaveScore();
-        ResetGame();
-        endGameMenu.GoToHighScores();
+        if (ScoreManager.instance != null)
+        {
+            ScoreManager.instance.SaveScore();
+        }
+        gameStarted = false;
+        GoToHighScores();
     }
 
     public void BrickDestroyed()
@@ -99,18 +162,6 @@ public class GameManager : MonoBehaviour
 
     void RegenerateLevel()
     {
-        Debug.Log("Regenerating level...");
-        brickGenerator.GenerateBricks();
-        remainingBricks = FindObjectsOfType<Brick>().Length;
-    }
-
-    public void ResetGame()
-    {
-        score = 0;
-        UpdateScoreText();
-        gameStarted = false;
-        PlayerNameInput.ClearPlayerName(); // Effacer le nom du joueur
-        PlayerNameInput.ShowInputField();
         if (brickGenerator != null)
         {
             brickGenerator.GenerateBricks();
@@ -122,16 +173,166 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void LaunchBall()
+    public void ResetGame()
     {
-        BallController ball = FindObjectOfType<BallController>();
-        if (ball != null)
+        if (ScoreManager.instance != null)
         {
-            ball.LaunchBall();
+            ScoreManager.instance.ResetScore();
+        }
+
+        if (brickGenerator != null)
+        {
+            if (brickGenerator.bricksContainer == null)
+            {
+                brickGenerator.bricksContainer = new GameObject("BricksContainer").transform;
+            }
+
+            brickGenerator.GenerateBricks();
+            remainingBricks = FindObjectsOfType<Brick>().Length;
         }
         else
         {
-            Debug.LogError("BallController not found in the scene.");
+            Debug.LogError("BrickGenerator is not assigned in GameManager.");
+        }
+
+        PlayerNameInput.ClearPlayerName();
+        PlayerNameInput.ShowInputField();
+
+        // Réinitialiser le timer
+        timeRemaining = gameDuration;
+
+        // Réinitialiser les vies
+        lives = 3;
+        UpdateLivesText();
+
+        // Initialiser timerText
+        InitializeTimerText();
+        UpdateTimerText();
+
+        // Réinitialiser ou instancier le paddle
+        ResetOrInstantiatePaddle();
+    }
+
+    void InitializeGame()
+    {
+        if (brickGenerator == null)
+        {
+            Debug.LogError("BrickGenerator is not assigned in GameManager.");
+            return;
+        }
+        ResetGame();
+    }
+
+    public void StartNewGame()
+    {
+        ResetGame();
+        gameStarted = true;
+        SpawnBall();
+    }
+
+    public void SpawnBall()
+    {
+        // Réassigner les références si elles sont nulles
+        if (ballPrefab == null)
+        {
+            ballPrefab = Resources.Load<GameObject>("BallPrefab"); // Assurez-vous que le prefab est dans un dossier Resources
+        }
+
+        if (paddleInstance == null)
+        {
+            ResetOrInstantiatePaddle();
+        }
+
+        Vector3 spawnPosition = paddleInstance.transform.position + new Vector3(0, 0, zOffset);
+        GameObject newBall = Instantiate(ballPrefab, spawnPosition, Quaternion.identity);
+        currentBall = newBall.GetComponent<BallController>();
+        if (currentBall != null)
+        {
+            currentBall.SetPaddleTransform(paddleInstance.transform); // Assigner la référence de la barre à la balle
+        }
+        else
+        {
+            Debug.LogError("BallController component not found on the spawned ball.");
+        }
+    }
+
+    void ResetOrInstantiatePaddle()
+    {
+        if (paddleInstance != null)
+        {
+            Destroy(paddleInstance);
+        }
+
+        paddleInstance = Instantiate(paddlePrefab);
+        DontDestroyOnLoad(paddleInstance);
+    }
+
+    public void LaunchNewBall()
+    {
+        // Réassigner les références si elles sont nulles
+        if (ballPrefab == null)
+        {
+            ballPrefab = Resources.Load<GameObject>("BallPrefab"); // Assurez-vous que le prefab est dans un dossier Resources
+        }
+
+        if (paddleInstance == null)
+        {
+            ResetOrInstantiatePaddle();
+        }
+
+        Vector3 spawnPosition = paddleInstance.transform.position + new Vector3(0, 0, zOffset);
+        GameObject newBall = Instantiate(ballPrefab, spawnPosition, Quaternion.identity);
+        BallController ballController = newBall.GetComponent<BallController>();
+        if (ballController != null)
+        {
+            ballController.SetPaddleTransform(paddleInstance.transform); // Assigner la référence de la barre à la balle
+            ballController.LaunchBall();
+        }
+        else
+        {
+            Debug.LogError("BallController component not found on the spawned ball.");
+        }
+    }
+
+    void GoToHighScores()
+    {
+        SceneManager.LoadScene("ScoreScene");
+    }
+
+    void InitializeTimerText()
+    {
+        if (timerText == null)
+        {
+            timerText = GameObject.Find("TimerText").GetComponent<TextMeshProUGUI>();
+        }
+    }
+
+    void UpdateLivesText()
+    {
+        if (livesText == null)
+        {
+            livesText = GameObject.Find("LivesText").GetComponent<TextMeshProUGUI>();
+            if (livesText == null)
+            {
+                Debug.LogError("LivesText not found in the scene.");
+                return;
+            }
+        }
+
+        livesText.text = "Lives: " + lives.ToString();
+    }
+
+    public void RespawnBall()
+    {
+        if (lives > 0)
+        {
+            lives--;
+            UpdateLivesText();
+            SpawnBall();
+        }
+        else
+        {
+            EndGame();
         }
     }
 }
